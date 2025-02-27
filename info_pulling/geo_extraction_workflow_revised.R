@@ -2,8 +2,9 @@
 library(GEOquery)
 library(readxl)
 library(writexl)
+#------------------------------------------------------------------------
 
-
+#Load .csv into a dataframe
 gse_df <- read.csv("gse.csv", header = FALSE, stringsAsFactors = FALSE)
 geo_ids <- as.character(gse_df[[1]])
 print(geo_ids)
@@ -11,6 +12,9 @@ print(geo_ids)
 
 geo_ids <- geo_ids[151:160]
 geo_ids
+
+#------------------------------------------------------------------------
+
 # Function to convert numeric GEO ID to standard GSE format
 convert_to_gse <- function(numeric_ids) {
   sapply(numeric_ids, function(numeric_id) {
@@ -31,10 +35,9 @@ convert_to_gse <- function(numeric_ids) {
   }, USE.NAMES = FALSE)  
 }
 
-
-
 geo_ids <- convert_to_gse(geo_ids)
 geo_ids
+#------------------------------------------------------------------------
 
 
 # Function to extract GEO information
@@ -70,6 +73,7 @@ get_gse_metadata <- function(geo_ids) {
   combined_df <- do.call(rbind, gse_dataframes)
   return(combined_df)
 }
+#------------------------------------------------------------------------
 
 # run it 
 metadata_df <- get_gse_metadata(geo_ids)
@@ -81,12 +85,10 @@ metadata_df$contact_name <- gsub(",+", " ", metadata_df$contact_name)
 metadata_df$SubSeries <- ifelse(grepl("SubSeries of: GSE[0-9]+", metadata_df$relation),
                                 sub(".*SubSeries of: (GSE[0-9]+).*", "\\1", metadata_df$relation), 
                                 NA)
-
 # Extract BioProject ID (always present in your cases)
 metadata_df$BioProject <- ifelse(grepl("BioProject: https://www.ncbi.nlm.nih.gov/bioproject/PRJNA[0-9]+", metadata_df$relation),
                                  sub(".*BioProject: https://www.ncbi.nlm.nih.gov/bioproject/(PRJNA[0-9]+).*", "\\1", metadata_df$relation), 
                                  NA)
-
 # Extract SRA ID (if present)
 metadata_df$SRA <- ifelse(grepl("SRA: https://www.ncbi.nlm.nih.gov/sra\\?term=SRP[0-9]+", metadata_df$relation),
                           sub(".*SRA: https://www.ncbi.nlm.nih.gov/sra\\?term=(SRP[0-9]+).*", "\\1", metadata_df$relation), 
@@ -96,6 +98,8 @@ metadata_df$SRA <- ifelse(grepl("SRA: https://www.ncbi.nlm.nih.gov/sra\\?term=SR
 print(metadata_df[, c("SubSeries", "BioProject", "SRA")])
 
 metadata_df$sample_number <- sapply(strsplit(metadata_df$sample_number, ", "), length)
+
+#------------------------------------------------------------------------
 
 metadata_df$sample_taxid
 
@@ -117,7 +121,7 @@ library(dplyr)
 metadata_df$organism <- taxonomy[as.character(metadata_df$sample_taxid)]
 metadata_df$sample_taxid
 metadata_df$organism
-
+#------------------------------------------------------------------------
 
 #convert dates
 metadata_df$last_update_date <- as.Date( metadata_df$last_update_date, format = "%b %d %Y")
@@ -126,4 +130,5 @@ metadata_df$last_update_date <- format( metadata_df$last_update_date, "%m/%d/%Y"
 metadata_df$submission_date<- as.Date( metadata_df$submission_date, format = "%b %d %Y")
 metadata_df$submission_date <- format( metadata_df$submission_date, "%m/%d/%Y")
 
+#create output .csv
 write.csv(metadata_df, "gse_metadata.csv", row.names = FALSE)
