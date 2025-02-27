@@ -1,0 +1,283 @@
+---
+title: "mod5"
+author: "Rori Hoover"
+date: "2024-11-22"
+output: html_document
+---
+
+```{r setup}
+#load in nesscary packages 
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(dplyr)
+#remotes::install_github("YuLab-SMU/ggbreak")
+library(ggbreak)
+library(palettetown)
+#load in the placenta spreadsheet 
+data <- read.csv("/Users/rorihoover/Desktop/work/Placenta_Study_Information_nov22.csv")
+```
+
+## filter library strategy 
+```{r}
+#for values present in the Library.strategy col make all the values lowercase
+data$Library.strategy <- tolower(data$Library.strategy)  
+#table(data$Library.strategy) #make table to determine filtering 
+```
+
+```{r}
+# Count occurrences of "seq" in each value
+seq_count <- str_count(data$Library.strategy, "seq")
+
+# Replace values with more than one "seq" occurrence with "multiple"
+data$Library.strategy[seq_count > 1] <- "multiple"
+
+# function to process the library list, function is not sensitive to white space
+data$Library.strategy <- sapply(data$Library.strategy, function(x) {
+  # Remove strange delimiter characters
+  x <- gsub("\\t", "", x)
+  x <- gsub("\\n", "", x)
+  
+  # Match and transform specific patterns
+  if (is.na(x) || x == "") {
+    return("Not Specified") #handle NAs first so that the rest of the function will run 
+  } else if (x == "-" || x == "?") { #handle "-" first to avoid issue with accidents with values like "RNA-seq"
+    return("Not Specified")
+  } else if (grepl("rna", x, ignore.case = TRUE) && grepl("seq", x, ignore.case = TRUE)) {
+    return("RNA-seq") #if value contains rna and seq then reclassify to "RNA-seq"
+  } else if (grepl("mic", x, ignore.case = TRUE) ) {
+    return("microarray") #if value contains mic then reclassify to "microarray"
+  } else if (grepl("q", x, ignore.case = TRUE) && grepl("pcr", x, ignore.case = TRUE)) {
+    return("qPCR")  #if value contains q and pcr  then reclassify to "qPCR"
+  } else if (grepl("bisulf", x, ignore.case = TRUE)) {
+    return("bisulfite-seq") #if value contains bisulf  then reclassify to "bisulfite-seq"
+  } else if (grepl("na", x, ignore.case = TRUE) || grepl("n/a", x, ignore.case = TRUE) ||
+             grepl("none", x, ignore.case = TRUE) || grepl("other", x, ignore.case = TRUE) ||
+             grepl("expression profiling", x, ignore.case = TRUE) || grepl("library", x,
+             ignore.case = TRUE)|| grepl("10x", x, ignore.case = TRUE) ||grepl("reagent", x,ignore.case = TRUE)
+             ) {
+    return("Not Specified") #classify other strange/not descriptive enteries as not specified 
+  } else if (grepl("bead", x, ignore.case = TRUE) || grepl("array", x, ignore.case = TRUE)) {
+    return("array") # reclassify differernt spellings of beadchip array as array 
+  } else {
+    return(x)
+  }
+})
+table(data$Library.strategy) #make table to check filtering 
+```
+
+## plot library strategy (exclude "not specified")
+```{r libStrat}
+
+# Remove values that are "Not Specified"
+library <- data$Library.strategy[data$Library.strategy != "Not Specified"]
+
+library <- data.frame(table(library))
+
+
+ggplot(library, aes(x = reorder(library, -Freq), y = Freq)) + #make values descending 
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(
+    title = "Proportion of Library Strategies",
+    x = "Library Strategy",
+    y = "Count"
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+ # Rotate x-axis 
+  scale_y_break(c(75, 500 )) # add in scale break
+
+ggsave("/Users/rorihoover/Desktop/work/libstrat22.pdf")
+```
+
+## filter submission date
+```{r}
+#  clean up the singular invalid date format
+data$Submission.date <- gsub("Aug \\d{1,2}st", "8/21",  data$Submission.date)
+
+# Convert to Date objects, with any invalid entries turned into NA
+data$Submission.date <- as.Date(data$Submission.date, format = "%m/%d/%Y")
+
+# Remove NA values (invalid date formats)
+dates <- na.omit(data$Submission.date)
+
+# Extract the year
+years <- format(dates, "%Y")
+
+# Count the occurrences of each year
+year_counts <- table(years)
+
+```
+
+```{r}
+# Plot bar chart
+barplot(year_counts, 
+        main = "Data Submission Date", 
+        xlab = "Year", 
+        ylab = "Count", 
+        col = "skyblue", 
+        border = "blue")
+ggsave("/Users/rorihoover/Desktop/work/subyear22.pdf")
+
+```
+
+```{r}
+
+# Create the new data frame containing submission data and lib strat 
+df <- data.frame(SubmissionDate = data$Submission.date, 
+                    LibraryStrategy = data$Library.strategy)
+df <- na.omit(df) #remove rows that have NA
+
+#create table with lib strat and submission year 
+df$SubmissionDate <- format(df$SubmissionDate, "%Y") 
+year_strategy_table <- table(df$SubmissionDate, df$LibraryStrategy)
+
+#Convert counts to proportions
+year_strategy_proportions <- prop.table(year_strategy_table, margin = 1)
+
+# Convert to data frame
+proportion_df <- as.data.frame(year_strategy_proportions)
+colnames(proportion_df) <- c("Year", "LibraryStrategy", "Proportion")
+
+rm(df) #remove df from environment 
+```
+
+```{r}
+
+#Plot 
+ggplot(proportion_df, aes(x = Year, y = Proportion, fill = LibraryStrategy)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Proportion of Library Strategies by Year",
+       x = "Year",
+       y = "Proportion",
+       fill = "Library Strategy") +
+       theme_minimal() 
+
+ggsave("/Users/rorihoover/Desktop/work/lib_strat_by_year.pdf", width = 8, height = 6, units = "in") 
+```
+
+```{r}
+#change colname to something easier to look at
+colnames(data)[colnames(data) == "Sex.of.Offspring.Provided..yes.no."] <- "Sex_of_Offspring"
+ 
+#convert all values in list to lowecase
+Sex_of_Offspring_list <- tolower(data$Sex_of_Offspring) 
+
+Sex_of_Offspring_list<- sapply(Sex_of_Offspring_list, function(x) {
+    if (is.na(x) || x == "") { # first reclassily NA values to not specified 
+    return("Not Specified")
+  } else if (grepl("yes", x, ignore.case = TRUE)) { #vaules containing yes are reclassifies as "Yes"
+    return("Yes")
+  } else if (grepl("no", x, ignore.case = TRUE)) { #vaules containing no are reclassifies as "No"
+    return("No")
+  } else if (grepl("n/a", x, ignore.case = TRUE) || grepl("not", x, ignore.case = TRUE)) {
+    return("Not Specified")
+  } else {
+    return("Not Specified")  # everything else gets not specified 
+  }
+})
+
+table(Sex_of_Offspring_list)
+```
+
+```{r}
+Sex_of_Offspring_df <- data.frame(Sex = Sex_of_Offspring_list)
+
+# Count the occurrences of each category and create dF
+count_data <- Sex_of_Offspring_df %>%
+  group_by(Sex) %>%
+  tally()
+
+# Create pie chart
+ggplot(count_data, aes(x = "", y = n, fill = Sex)) + 
+  geom_bar(stat = "identity", width = 1) + 
+  coord_polar(theta = "y") + 
+  labs(title = "Sex of Offspring") + 
+  theme_void() + 
+  theme(legend.title = element_blank()) 
+ggsave("/Users/rorihoover/Desktop/work/sexoff22.pdf")
+```
+
+
+```{r}
+data$Organism <- tolower(data$Organism) #convert values to lowercase 
+
+data$Organism <- sapply(data$Organism, function(x) {
+  # Remove strange leftove delimiters 
+  x <- gsub("\\t", "", x)
+  x <- gsub("\\n", "", x)
+  
+  if (is.na(x) || x == "") {
+    return("Not Specified")
+  } else if (grepl(";", x, ignore.case = TRUE) || # reclassify anything that 2 organsims as multiple 
+             grepl(":", x, ignore.case = TRUE) || 
+             grepl(",", x, ignore.case = TRUE) || 
+             grepl("x", x, ignore.case = TRUE) || 
+             grepl("or", x, ignore.case = TRUE) || 
+             grepl("and", x, ignore.case = TRUE)) {
+    return("multiple")
+  } else if (grepl("mus", x, ignore.case = TRUE) || grepl("mice", x, ignore.case = TRUE)) {
+    return("Mus Musculus") # reclassify vaules that contain mus as Mus Musculus 
+  } else if (grepl("homo", x, ignore.case = TRUE) || grepl("mice", x, ignore.case = TRUE)) {
+    return("Homo Sapiens")  # reclassify vaules that contain homo as "Homo Sapiens"
+  } else if (grepl("sus", x, ignore.case = TRUE) || grepl("mice", x, ignore.case = TRUE)) {
+    return("Sus Scrofa ")  # reclassify vaules that contain Sus as "Sus Scrofa"
+  } else {
+    return(x)  # Return the original value if no conditions are met
+  }
+})
+
+table(data$Organism)# check table 
+```
+
+
+```{r}
+# Generate the frequency table and convert it to a data frame
+organism_counts <- as.data.frame(table(data$Organism))
+
+# Rename columns 
+colnames(organism_counts) <- c("Organism", "Frequency")
+
+# Create a bar chart
+ggplot(organism_counts, aes(x = reorder(Organism, -Frequency), y = Frequency, fill = Organism)) + #in descending order 
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Organisms Present in Database", x = "Organism", y = "Frequency") +
+  theme_minimal() +
+  scale_fill_poke(pokemon = 318) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis 
+```
+```{r}
+
+# Create the new data frame
+df <- data.frame(Organism = data$Organism, 
+                    SubmissionDate = data$Submission.date)
+df <- na.omit(df)
+
+df$SubmissionDate <- format(df$SubmissionDate, "%Y")
+
+#create table
+year_Organism_table <- table(df$SubmissionDate, df$Organism)
+
+#Convert counts to proportions
+year_Organism_proportions <- prop.table(year_Organism_table, margin = 1)
+
+# Convert to data frame
+proportion_df2 <- as.data.frame(year_Organism_proportions)
+colnames(proportion_df2) <- c("Year", "Organism", "Proportion")
+```
+
+
+# make plot 
+```{r}
+#Plot 
+ggplot(proportion_df2, aes(x = Year, y = Proportion, fill = Organism)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Proportion of Organisms Studied by Year",
+       x = "Year",
+       y = "Proportion",
+       fill = "Organism") +
+  theme_minimal()+
+  scale_fill_poke(pokemon = 2)
+
+ggsave("/Users/rorihoover/Desktop/work/Org_by_year.pdf", width = 8, height = 6, units = "in") 
+```
