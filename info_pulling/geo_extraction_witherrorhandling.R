@@ -1,38 +1,38 @@
-# Load packages
+#load packages
 library(GEOquery)
 library(readxl)
 library(writexl)
 library(dplyr)
 #------------------------------------------------------------------------
 
-# Load .csv into a dataframe
+#load .csv into a dataframe
 gse_df <- read.csv("gse.csv", header = FALSE, stringsAsFactors = FALSE)
 geo_ids <- as.character(gse_df[[1]])
 print(geo_ids)
 
-# Limit processing to a subset for testing
+#limit processing to a subset for testing
 geo_ids <- geo_ids[1:10]
 geo_ids
 
 
 #------------------------------------------------------------------------
 
-# Function to convert numeric GEO ID to standard GSE format
+#function to convert numeric GEO ID to standard GSE format
 convert_to_gse <- function(numeric_ids) {
   sapply(numeric_ids, function(numeric_id) {
     numeric_id <- as.character(numeric_id)
     
-    # If ID starts with "2000", remove "2000" prefix
+    #if ID starts with "2000", remove "2000" prefix
     if (grepl("^2000", numeric_id)) {
       return(paste0("GSE", sub("^2000", "", numeric_id)))
     }
     
-    # If ID starts with "200", remove "200" prefix
+    #if ID starts with "200", remove "200" prefix
     if (grepl("^200", numeric_id)) {
       return(paste0("GSE", sub("^200", "", numeric_id)))
     }
     
-    # Otherwise, return as "GSE" + numeric_id
+    #otherwise, return as "GSE" + numeric_id
     return(paste0("GSE", numeric_id))
   }, USE.NAMES = FALSE)  
 }
@@ -42,7 +42,7 @@ geo_ids
 #------------------------------------------------------------------------
 
 
-# Function to extract GEO information with error handling
+#function to extract GEO information with error handling
 get_gse_metadata <- function(geo_ids) {
   failed_ids <- c()
   gse_dataframes <- list()
@@ -83,22 +83,22 @@ get_gse_metadata <- function(geo_ids) {
     }
   }
   
-  # Combine all individual GSE data frames into one
+  #combine all individual GSE data frames into one
   combined_df <- do.call(rbind, gse_dataframes)
   return(list(data = combined_df, failed = failed_ids))
 }
 #------------------------------------------------------------------------
 
 
-# Run it
+#run it
 metadata_result <- get_gse_metadata(geo_ids)
 metadata_df <- metadata_result$data
 failed_ids <- metadata_result$failed
 
-# Replace ",," and "," with a space in the contact_name column
+#replace ",," and "," with a space in the contact_name column
 metadata_df$contact_name <- gsub(",+", " ", metadata_df$contact_name)
 
-# Extract SubSeries, BioProject, and SRA IDs
+#extract SubSeries, BioProject, and SRA IDs
 metadata_df$SubSeries <- ifelse(grepl("SubSeries of: GSE[0-9]+", metadata_df$relation),
                                 sub(".*SubSeries of: (GSE[0-9]+).*", "\\1", metadata_df$relation), 
                                 NA)
@@ -135,11 +135,11 @@ metadata_df$organism
 #------------------------------------------------------------------------
 
 
-# Convert dates
+#convert dates
 metadata_df$last_update_date <- format(as.Date(metadata_df$last_update_date, format = "%b %d %Y"), "%m/%d/%Y")
 metadata_df$submission_date <- format(as.Date(metadata_df$submission_date, format = "%b %d %Y"), "%m/%d/%Y")
 
-# Save output
+#save output
 write.csv(metadata_df, "gse_metadata.csv", row.names = FALSE)
 write.csv(data.frame(Failed_GSE_IDs = failed_ids), "failed_gse_ids.csv", row.names = FALSE)
 
