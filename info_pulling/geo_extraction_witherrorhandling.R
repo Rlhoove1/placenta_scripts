@@ -17,7 +17,7 @@ library(data.table)
 library(rvest)
 
 #---------------------------------
-# Clear GEOquery cache helper
+# Clear GEOquery cache helper, helpful for better testing
 #---------------------------------
 unlink("geo_cache", recursive = TRUE)
 dir.create("geo_cache", showWarnings = FALSE)
@@ -203,4 +203,4 @@ write_xlsx(list(
   Failed   = tibble(Failed_GSE_IDs = failed_ids)
 ), "gse_metadata_full.xlsx")
 
-print("✅ Processing complete. Results saved to gse_metadata_full.xlsx")
+print("Processing complete. Results saved to gse_metadata_full.xlsx")
