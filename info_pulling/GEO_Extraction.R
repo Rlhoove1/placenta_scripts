@@ -369,7 +369,7 @@ output_df <- metadata_df %>%
     `Data type` = data_type,
     `SuperSeries, list GEO Series that are part of the SuperSeries` = Superseries,
     `Sample size (placenta)` = placenta_samples,
-    `PlTitle` = title,
+    `Title` = title,
     `Organism` = organism,
     `Characteristics` = characteristics,
     `Extracted molecule` = extracted_molecule,
